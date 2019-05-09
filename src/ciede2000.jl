@@ -18,7 +18,7 @@ end
 
 CIEDE2000() = CIEDE2000(DE_2000())
 
-function evaluate(d::CIEDE2000, imgA::GenericImage, imgB::GenericImage)
+function evaluate(d::CIEDE2000, imgA::AbstractArray{<:Colorant}, imgB::AbstractArray{<:Colorant})
     sum(abs, [colordiff(ca, cb, d.metric) for (ca, cb) in zip(imgA, imgB)])
 end
 
@@ -26,13 +26,18 @@ end
 @doc (@doc CIEDE2000)
 ciede2000(imgA::GenericImage, imgB::GenericImage; metric=DE_2000()) = evaluate(CIEDE2000(metric), imgA, imgB)
 
-
-evaluate(dist::CIEDE2000, a::GenericImage{T1}, b::GenericImage{T2}) where  {T1<:FixedPoint, T2<:FixedPoint} =
-    evaluate(dist, intermediatetype(T1).(a), intermediatetype(T2).(b))
-
 evaluate(d::CIEDE2000, imgA::AbstractArray{<:Number}, imgB::AbstractArray{<:Number}) =
     evaluate(d, Gray.(imgA), Gray.(imgB))
+evaluate(d::CIEDE2000, imgA::AbstractArray{<:Number}, imgB::AbstractArray{<:AbstractGray}) =
+    evaluate(d, eltype(imgB).(imgA), imgB)
+evaluate(d::CIEDE2000, imgA::AbstractArray{<:AbstractGray}, imgB::AbstractArray{<:Number}) =
+    evaluate(d, imgA, eltype(imgA).(imgB))
 
-# fix ambiguity
-evaluate(dist::CIEDE2000, a::Gray2dImage{T1}, b::Gray2dImage{T2}) where  {T1<:FixedPoint, T2<:FixedPoint} =
-evaluate(dist, intermediatetype(T1).(a), intermediatetype(T2).(b))
+evaluate(dist::CIEDE2000, a::GenericGrayImage{T1}, b::GenericGrayImage{T2}) where  {T1<:PromoteType, T2<:PromoteType} =
+    evaluate(dist, intermediatetype(T1).(a), intermediatetype(T2).(b))
+
+function evaluate(dist::CIEDE2000, a::AbstractArray{<:Color3{T1}}, b::AbstractArray{<:Color3{T2}}) where {T1<:FixedPoint, T2<:FixedPoint}
+    CT1 = base_colorant_type(eltype(a)){intermediatetype(T1)}
+    CT2 = base_colorant_type(eltype(b)){intermediatetype(T2)}
+    evaluate(dist, CT1.(a), CT2.(b))
+end
